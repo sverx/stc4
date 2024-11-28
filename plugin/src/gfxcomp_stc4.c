@@ -34,9 +34,7 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
   unsigned char buffer[4];
   unsigned char group_repetitions=0;
   unsigned char group_unmatches,group_unmatches_mask;
-
-  // test
-  //~ unsigned char inv_group_unmatches,inv_group_unmatches_mask;
+  unsigned char inv_group_unmatches,inv_group_unmatches_mask;
 
   for (tilenum=0;tilenum<numTiles;tilenum++) {  // loop over all tiles
     for (i=0;i<8;i++,pSource+=4) {              // loop over all the 8 rows of the tile
@@ -61,7 +59,7 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
 
           if (group_repetitions>0) {
 
-            *pDestination++=group_repetitions;
+            *pDestination++=group_repetitions;              // dump the repetitions
             finalsize++;
             group_repetitions=0;
 
@@ -130,36 +128,36 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
           }
         }
 
-        //~ inv_group_unmatches=0;
-        //~ inv_group_unmatches_mask=0;
-        //~ for (j=0;j<4;j++) {                       // check how many NOT inverted matches we have
-          //~ if (buffer[j]!=(~pSource[j])) {
-            //~ inv_group_unmatches++;
-            //~ inv_group_unmatches_mask|=(1<<(3-j));
-          //~ }
-        //~ }
+        inv_group_unmatches=0;
+        inv_group_unmatches_mask=0;
+        for (j=0;j<4;j++) {                       // check how many NOT inverted matches we have
+          if (buffer[j]!=(~pSource[j])) {
+            inv_group_unmatches++;
+            inv_group_unmatches_mask|=(1<<(3-j));
+          }
+        }
 
         // use inverted match only if better than regular matches
-        //~ if (inv_group_unmatches<group_unmatches)  {
+        if (inv_group_unmatches<group_unmatches)  {
 
-          //~ if (inv_group_unmatches<valuescount) {        // pick the inverted group match only if it's the best option (if it saves compared to previous method)
+          if (inv_group_unmatches<valuescount) {        // pick the inverted group match only if it's the best option (if it saves compared to previous method)
 
-            //~ *pDestination++=(INV_GROUP_MATCHES_MASK|group_unmatches_mask);   // write group mask byte
-            //~ finalsize++;
+            *pDestination++=(INV_GROUP_MATCHES_MASK|inv_group_unmatches_mask);   // write group mask byte
+            finalsize++;
 
-            //~ for (j=0;j<4;j++) {                     // write the mismatching bytes
-              //~ if (buffer[j]!=(~pSource[j])) {
-                //~ *pDestination++=pSource[j];
-                //~ finalsize++;
-              //~ }
-            //~ }
+            for (j=0;j<4;j++) {                     // write the mismatching bytes
+              if (buffer[j]!=(~pSource[j])) {
+                *pDestination++=pSource[j];
+                finalsize++;
+              }
+            }
 
-            //~ memcpy(&buffer,pSource,4);              // copy these last 4 bytes to the buffer
+            memcpy(&buffer,pSource,4);              // copy these last 4 bytes to the buffer
 
-            //~ continue;                               // this is because we already processed these 4 bytes
-          //~ }
+            continue;                               // this is because we already processed these 4 bytes
+          }
 
-        //~ } else {
+        } else {
 
           if (group_unmatches<valuescount) {        // pick the group match only if it's the best option (if it saves compared to previous method)
 
@@ -178,7 +176,7 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
             continue;                               // this is because we already processed these 4 bytes
 
           }
-        //~ }
+        }
 
       }
 
@@ -193,8 +191,9 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
         *pDestination++=values[j];      // dump uncompressed values
 
       finalsize+=(1+valuescount);       // add this to finalsize
-    }
-  }
+
+    }  // end loop rows
+  }  // end loop tiles
 
   /* tiles are finished, check if we still have to dump a group repetition run */
   if (group_repetitions>0) {
@@ -204,7 +203,7 @@ __declspec(dllexport) int compressTiles(const uint8_t* pSource, const uint32_t n
 
   }
 
-  *pDestination=0x00;                   // end of data marker
+  *pDestination=0x00;                   // end of compressed data marker
   finalsize++;
 
   return (finalsize);                   // report size to caller

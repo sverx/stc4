@@ -1,5 +1,5 @@
 ;~ STC4 simple tile compressor four (based on STC0)
-;~   [by sverx, 09/09/2022]
+;~   [by sverx, 28/11/2022]
 ;~
 ;~ uses 4 bytes RAM buffer
 ;~
@@ -13,17 +13,15 @@
 ;~ 0b11 -> byte has value 0xFF
 ;~ 0b01 -> byte is a different value, uncompressed byte follows
 ;~ 0b00 -> repeat last uncompressed value from same group of 4 bytes
-
-
+;~
+;~
 ;~ note: if D7,D6 are both zero it means this whole group of 4 bytes is based on the previous group so:
 ;~
 ;~       if D5 = 0 then we need to repeat the previous group again, up to 31 times (counter is value in D4-D0) or EOD if counter is 0
 ;~
 ;~       else if D5 = 1 then we need to use the last group of 4 bytes replacing each value that has a 1 in D3-D0 with a raw value that follows (up to 3)
+;~          [ and if D4 is 1 then it means bytes from the previous group of 4 bytes needs to be complemented, so for instance a value of $02 becomes $FD and viceversa ]
 ;~
-;~       [ D4 is unused in this case (future expansion)? ]
-
-
 ;~  IN:
 ;~      HL (data source address)
 ;~      DE (destination in VRAM w/flags)
@@ -54,6 +52,7 @@ _stc4_decompress_outer_loop:
   ld a,(hl)
   cp $20                              ; if value less than $20 it's a rerun or an end-of-data marker
   jp c,_reruns_or_leave               ; too far for JR
+
   ld de,stc4_buffer
 
 ; ************************************
@@ -119,8 +118,9 @@ _bitmask_{COUNT}:
 
 ; ************************************
 _diff:
-  rla                                 ; *** skip D5 [*set* bit]  ***
-  rla                                 ; *** skip D4 [unused bit] ***
+  rla                                 ; skip D5
+  ld c,a                              ; save D4 in C's MSB
+  rla                                 ; skip D4
 
 .rept 4 index COUNT
 _diff_bit_{COUNT}:
@@ -130,6 +130,11 @@ _diff_bit_{COUNT}:
 .endif
   jr c,@_diff
   ld a,(de)
+  bit 7,c
+  jr z,+
+  cpl                                 ; invert data if D4 was set
+  ld (de),a                           ; and save it back into the buffer
++:
   out (VDP_DATA_PORT),a               ; write byte from buffer to VRAM
   jp @next_bit
 @_diff:
