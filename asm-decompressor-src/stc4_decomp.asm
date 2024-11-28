@@ -95,8 +95,6 @@ _bitmask_{COUNT}:
 
 .if COUNT != 0
 @_same_byte:
-  rla
-  jr c,_diff
 .if COUNT != 3
   ld b,a                              ; preserve A
 .endif
