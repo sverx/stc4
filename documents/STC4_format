@@ -1,0 +1,28 @@
+STC4 simple tile compressor
+
+uses 4 bytes RAM buffer
+
+one byte holds information on how to create a group of 4 bytes, providing two bits for each:
+
+    D7 D6          D5 D4            D3 D2          D1 D0
+ 
+   1st byte       2nd byte         3rd byte       4th byte
+
+%10 -> byte has value $00
+%11 -> byte has value $FF
+%01 -> byte is a different value, uncompressed byte follows
+%00 -> repeat last uncompressed value from same group of 4 bytes
+
+
+note: if D7,D6 are both zero it means this new whole group of 4 bytes is based on the previous group so:
+
+      - if D5 = 0 then we need to repeat the whole previous group again, up to 31 times (counter is value in D4-D0) 
+
+        %000nnnnn  (if nnnnn is 0 it means EOD)
+
+      - if D5 = 1 then we need to use the last group of 4 bytes replacing each value that has a 1 in D3-D0 with a raw value that follows (up to 3)
+
+        %001cxxxx  (xxxx contains from 0 up to 3 'ones')
+
+        [ if D4 is 1 then it means bytes from the previous group of 4 bytes needs to be complemented, so for instance a value of $02 becomes $FD and viceversa ]
+
